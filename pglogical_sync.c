@@ -85,6 +85,7 @@
 #define Anum_sync_relname		4
 #define Anum_sync_status		5
 #define Anum_sync_statuslsn		6
+#define ReplicationOriginRelationId 6000
 
 void pglogical_sync_main(Datum main_arg);
 
@@ -353,7 +354,7 @@ static RepOriginId
 ensure_replication_origin(char *slot_name)
 {
 	RepOriginId origin = replorigin_by_name(slot_name, true);
-
+	printf("%s\n", __func__);
 	if (origin == InvalidRepOriginId)
 		origin = replorigin_create(slot_name);
 
@@ -846,7 +847,7 @@ pglogical_sync_subscription(PGLogicalSubscription *sub)
 	char			status;
 	MemoryContext	myctx,
 					oldctx;
-
+	printf("%s\n", __func__);
 	/* We need our own context for keeping things between transactions. */
 	myctx = AllocSetContextCreate(CurrentMemoryContext,
 								   "pglogical_sync_subscription cxt",
@@ -924,7 +925,7 @@ pglogical_sync_subscription(PGLogicalSubscription *sub)
 
 				StartTransactionCommand();
 
-				originid = ensure_replication_origin(sub->slot_name);
+				originid = ensure_replication_origin(sub->slot_name); // pg_replication_origin_create
 				elog(DEBUG3, "advancing origin with oid %u for forwarded row to %X/%X during subscription sync",
 					originid,
 					(uint32)(XactLastCommitEnd>>32), (uint32)XactLastCommitEnd);
@@ -1186,7 +1187,7 @@ pglogical_sync_main(Datum main_arg)
 	MemoryContext	saved_ctx;
 	char		   *tablename;
 	char			status;
-
+	printf("%s\n", __func__);
 	/* Setup shmem. */
 	pglogical_worker_attach(slot, PGLOGICAL_WORKER_SYNC);
 	MySyncWorker = &MyPGLogicalWorker->worker.sync;

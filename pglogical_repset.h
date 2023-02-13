@@ -65,8 +65,9 @@ extern void alter_replication_set(PGLogicalRepSet *repset);
 extern void drop_replication_set(Oid setid);
 extern void drop_node_replication_sets(Oid nodeid);
 
-extern void replication_set_add_table(Oid setid, Oid reloid,
-						  List *att_list, Node *row_filter);
+extern void replication_set_add_table(Oid setid, Oid reloid, List *att_list, Node *row_filter);
+extern void recurse_alter_replication_set_table(PGLogicalRepSet *repset, Oid reloid, List *att_list, Node *row_filter, bool synchronize);
+extern void alter_replication_set_table(Oid setid, Oid reloid, List *att_list, Node *row_filter);
 extern void replication_set_add_seq(Oid setid, Oid seqoid);
 extern List *replication_set_get_tables(Oid setid);
 extern List *replication_set_get_seqs(Oid setid);

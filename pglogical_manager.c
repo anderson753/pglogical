@@ -196,7 +196,7 @@ pglogical_manager_main(Datum main_arg)
 	int			slot = DatumGetInt32(main_arg);
 	Oid			extoid;
 	int			sleep_timer = INITIAL_SLEEP;
-
+	printf("%s\n", __func__);
 	/* Setup shmem. */
 	pglogical_worker_attach(slot, PGLOGICAL_WORKER_MANAGER);
 

@@ -73,7 +73,7 @@
 #include "pglogical_apply_heap.h"
 #include "pglogical_apply_spi.h"
 #include "pglogical.h"
-
+#define ReplicationOriginRelationId 6000
 
 void pglogical_apply_main(Datum main_arg);
 
@@ -1886,7 +1886,7 @@ pglogical_apply_main(Datum main_arg)
 	MemoryContext	saved_ctx;
 	char		   *repsets;
 	char		   *origins;
-
+	printf("%s\n", __func__);
 	/* Setup shmem. */
 	pglogical_worker_attach(slot, PGLOGICAL_WORKER_APPLY);
 	Assert(MyPGLogicalWorker->worker_type == PGLOGICAL_WORKER_APPLY);
@@ -1955,7 +1955,7 @@ pglogical_apply_main(Datum main_arg)
 		apply_delay =
 			interval_to_timeoffset(MySubscription->apply_delay) / 1000;
 
-	/* If the subscription isn't initialized yet, initialize it. */
+	/* If the subscription isn't initialized yet, initialize it.● */
 	pglogical_sync_subscription(MySubscription);
 
 	elog(DEBUG1, "connecting to provider %s, dsn %s",
@@ -1971,6 +1971,7 @@ pglogical_apply_main(Datum main_arg)
 	originid = replorigin_by_name(MySubscription->slot_name, false);
 	elog(DEBUG2, "setting up replication origin %s (oid %u)",
 		MySubscription->slot_name, originid);
+	/* pg_replication_origin_session_setup ● pg_replication_origin_session_progress */
 	replorigin_session_setup(originid);
 	replorigin_session_origin = originid;
 	origin_startpos = replorigin_session_get_progress(false);

@@ -758,7 +758,7 @@ pg_decode_origin_filter(LogicalDecodingContext *ctx,
 		 * 'forward_origins'.
 		 */
 		ret = list_length(data->forward_origins) == 0;
-
+	printf("%s(%d), return : %d\n", __func__, origin_id, ret);
 	return ret;
 }
 #endif

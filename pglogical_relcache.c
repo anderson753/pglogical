@@ -51,10 +51,21 @@ relcache_free_entry(PGLogicalRelation *entry)
 		pfree(entry->attnames);
 	}
 
+	if (entry->nkeys > 0)
+	{
+		int	j;
+
+		for (j = 0; j < entry->nkeys; j++)
+			pfree(entry->keynames[j]);
+
+		pfree(entry->keynames);
+	}
+
 	if (entry->attmap)
 		pfree(entry->attmap);
 
 	entry->natts = 0;
+	entry->nkeys = 0;
 	entry->reloid = InvalidOid;
 	entry->rel = NULL;
 }
@@ -124,12 +135,12 @@ pglogical_relation_open(uint32 remoteid, LOCKMODE lockmode)
 
 void
 pglogical_relation_cache_update(uint32 remoteid, char *schemaname,
-								 char *relname, int natts, char **attnames)
+								 char *relname, int natts, char **attnames, int nkeys, char **keynames)
 {
 	MemoryContext		oldcontext;
 	PGLogicalRelation  *entry;
 	bool				found;
-	int					i;
+	int					i,j;
 
 	if (PGLogicalRelationHash == NULL)
 		pglogical_relcache_init();
@@ -151,6 +162,10 @@ pglogical_relation_cache_update(uint32 remoteid, char *schemaname,
 	entry->attnames = palloc(natts * sizeof(char *));
 	for (i = 0; i < natts; i++)
 		entry->attnames[i] = pstrdup(attnames[i]);
+	entry->nkeys = nkeys;
+	entry->keynames = palloc(nkeys * sizeof(char *));
+	for (j = 0; j < nkeys; j++)
+		entry->keynames[j] = pstrdup(attnames[j]);
 	entry->attmap = palloc(natts * sizeof(int));
 	MemoryContextSwitchTo(oldcontext);
 
