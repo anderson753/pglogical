@@ -165,7 +165,7 @@ pglogical_relation_cache_update(uint32 remoteid, char *schemaname,
 	entry->nkeys = nkeys;
 	entry->keynames = palloc(nkeys * sizeof(char *));
 	for (j = 0; j < nkeys; j++)
-		entry->keynames[j] = pstrdup(attnames[j]);
+		entry->keynames[j] = pstrdup(keynames[j]);
 	entry->attmap = palloc(natts * sizeof(int));
 	MemoryContextSwitchTo(oldcontext);
 
