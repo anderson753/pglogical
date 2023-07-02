@@ -171,107 +171,78 @@ pglogical_apply_spi_insert(PGLogicalRelation *rel, PGLogicalTupleData *newtup)
  * Handle update via SPI.
  */
 void
-pglogical_apply_spi_update(PGLogicalRelation *rel, PGLogicalTupleData *oldtup,
-						   PGLogicalTupleData *newtup)
+pglogical_apply_spi_update(PGLogicalRelation *rel, PGLogicalTupleData *oldtup, PGLogicalTupleData *newtup)
 {
-	TupleDesc		desc = RelationGetDescr(rel->rel);
-	Oid				argtypes[MaxTupleAttributeNumber];
-	Datum			values[MaxTupleAttributeNumber];
-	char			nulls[MaxTupleAttributeNumber];
-	StringInfoData	cmd;
-	Bitmapset	   *id_attrs;
-	int	att,
-		key,
-		narg,
-		firstarg;
+    TupleDesc       desc = RelationGetDescr(rel->rel);
+    Oid             argtypes[MaxTupleAttributeNumber];
+    Datum           values[MaxTupleAttributeNumber];
+    char            nulls[MaxTupleAttributeNumber];
+    StringInfoData  cmd;
+    Bitmapset      *id_attrs;
+    int             att, key, narg, firstarg;
 
-	id_attrs = RelationGetIndexAttrBitmap(rel->rel,
-										  INDEX_ATTR_BITMAP_IDENTITY_KEY);
+    id_attrs = RelationGetIndexAttrBitmap(rel->rel, INDEX_ATTR_BITMAP_IDENTITY_KEY);
+    if (id_attrs == NULL && RelationGetForm(rel->rel)->relkind == RELKIND_FOREIGN_TABLE)
+    {
+        for (key = 0; key < rel->nkeys; key++)
+        {
+            id_attrs = bms_add_member(id_attrs, tupdesc_get_att_by_name(desc, rel->keynames[key]) + 1 - FirstLowInvalidHeapAttributeNumber);
+        }
+    }
 
-	initStringInfo(&cmd);
-	appendStringInfo(&cmd, "UPDATE %s SET ",
-					 quote_qualified_identifier(rel->nspname, rel->relname));
+    initStringInfo(&cmd);
+    appendStringInfo(&cmd, "UPDATE %s SET ", quote_qualified_identifier(rel->nspname, rel->relname));
 
-	for (att = 0, narg = 0; att < desc->natts; att++)
-	{
-		if (TupleDescAttr(desc,att)->attisdropped)
-			continue;
+    for (att = 0, narg = 0; att < desc->natts; att++)
+    {
+        if (TupleDescAttr(desc,att)->attisdropped)
+            continue;
 
-		if (!newtup->changed[att])
-			continue;
+        if (!newtup->changed[att])
+            continue;
 
-		if (id_attrs == NULL && RelationGetForm(rel->rel)->relkind == RELKIND_FOREIGN_TABLE)
-		{
-			bool isKey = false;
-			for (key = 0; key < rel->nkeys; key++)
-			{
-				if (strcmp(NameStr(TupleDescAttr(desc,att)->attname),rel->keynames[key]) == 0)
-				{
-					isKey = true;
-				}
-			}
-			if (isKey)
-				continue;
-		}
+        if (RelationGetForm(rel->rel)->relkind == RELKIND_FOREIGN_TABLE)
+        {
+            if (bms_is_member(TupleDescAttr(desc,att)->attnum - FirstLowInvalidHeapAttributeNumber, id_attrs))
+                continue;
+        }
 
-		if (narg > 0)
-			appendStringInfo(&cmd, ", %s = $%u",
-							 quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)),
-							 narg + 1);
-		else
-			appendStringInfo(&cmd, "%s = $%u",
-							 quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)),
-							 narg + 1);
+        if (narg > 0)
+            appendStringInfo(&cmd, ", %s = $%u", quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)), narg + 1);
+        else
+            appendStringInfo(&cmd, "%s = $%u", quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)), narg + 1);
 
-		argtypes[narg] = TupleDescAttr(desc,att)->atttypid;
-		values[narg] = newtup->values[att];
-		nulls[narg] = newtup->nulls[att] ? 'n' : ' ';
-		narg++;
-	}
+        argtypes[narg] = TupleDescAttr(desc,att)->atttypid;
+        values[narg] = newtup->values[att];
+        nulls[narg] = newtup->nulls[att] ? 'n' : ' ';
+        narg++;
+    }
 
-	appendStringInfoString(&cmd, " WHERE");
+    appendStringInfoString(&cmd, " WHERE");
 
-	firstarg = narg;
-	for (att = 0; att < desc->natts; att++)
-	{
-	    if (id_attrs == NULL && RelationGetForm(rel->rel)->relkind == RELKIND_FOREIGN_TABLE)
-	    {
-	    	bool isKey = false;
-	    	for (key = 0; key < rel->nkeys; key++)
-	    	{
-	    		if (strcmp(NameStr(TupleDescAttr(desc,att)->attname),rel->keynames[key]) == 0)
-	    		{
-	    			isKey = true;
-	    		}
-	    	}
-	    	if (!isKey)
-	    		continue;
-	    }
-	    else if (!bms_is_member(TupleDescAttr(desc,att)->attnum - FirstLowInvalidHeapAttributeNumber,
-						   id_attrs))
-			continue;
+    firstarg = narg;
+    for (att = 0; att < desc->natts; att++)
+    {
+        if (!bms_is_member(TupleDescAttr(desc,att)->attnum - FirstLowInvalidHeapAttributeNumber, id_attrs))
+            continue;
 
-		if (narg > firstarg)
-			appendStringInfo(&cmd, " AND %s = $%u",
-							 quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)),
-							 narg + 1);
-		else
-			appendStringInfo(&cmd, " %s = $%u",
-							 quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)),
-							 narg + 1);
+        if (narg > firstarg)
+            appendStringInfo(&cmd, " AND %s = $%u", quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)), narg + 1);
+        else
+            appendStringInfo(&cmd, " %s = $%u", quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)), narg + 1);
 
-		argtypes[narg] = TupleDescAttr(desc,att)->atttypid;
-		values[narg] = oldtup->values[att];
-		nulls[narg] = oldtup->nulls[att] ? 'n' : ' ';
-		narg++;
-	}
+        argtypes[narg] = TupleDescAttr(desc,att)->atttypid;
+        values[narg] = oldtup->values[att];
+        nulls[narg] = oldtup->nulls[att] ? 'n' : ' ';
+        narg++;
+    }
 
-	if (SPI_execute_with_args(cmd.data, narg, argtypes, values, nulls, false,
-							  0) != SPI_OK_UPDATE)
-		elog(ERROR, "SPI_execute_with_args failed");
-	MemoryContextSwitchTo(MessageContext);
+    if (SPI_execute_with_args(cmd.data, narg, argtypes, values, nulls, false, 0) != SPI_OK_UPDATE)
+        elog(ERROR, "SPI_execute_with_args failed");
+    MemoryContextSwitchTo(MessageContext);
 
-	pfree(cmd.data);
+    if (bms_is_empty(id_attrs)) bms_free(id_attrs);
+    pfree(cmd.data);
 }
 
 /*
@@ -280,63 +251,53 @@ pglogical_apply_spi_update(PGLogicalRelation *rel, PGLogicalTupleData *oldtup,
 void
 pglogical_apply_spi_delete(PGLogicalRelation *rel, PGLogicalTupleData *oldtup)
 {
-	TupleDesc		desc = RelationGetDescr(rel->rel);
-	Oid				argtypes[MaxTupleAttributeNumber];
-	Datum			values[MaxTupleAttributeNumber];
-	char			nulls[MaxTupleAttributeNumber];
-	StringInfoData	cmd;
-	Bitmapset	   *id_attrs;
-	int	att,
-		key,
-		narg;
+    TupleDesc       desc = RelationGetDescr(rel->rel);
+    Oid             argtypes[MaxTupleAttributeNumber];
+    Datum           values[MaxTupleAttributeNumber];
+    char            nulls[MaxTupleAttributeNumber];
+    StringInfoData  cmd;
+    Bitmapset      *id_attrs;
+    int             att, key, narg;
 
-	id_attrs = RelationGetIndexAttrBitmap(rel->rel,
-										  INDEX_ATTR_BITMAP_IDENTITY_KEY);
+    id_attrs = RelationGetIndexAttrBitmap(rel->rel, INDEX_ATTR_BITMAP_IDENTITY_KEY);
 
-	initStringInfo(&cmd);
-	appendStringInfo(&cmd, "DELETE FROM %s WHERE",
-					 quote_qualified_identifier(rel->nspname, rel->relname));
+    initStringInfo(&cmd);
+    appendStringInfo(&cmd, "DELETE FROM %s WHERE", quote_qualified_identifier(rel->nspname, rel->relname));
 
-	for (att = 0, narg = 0; att < desc->natts; att++)
-	{
-	    if (id_attrs == NULL && RelationGetForm(rel->rel)->relkind == RELKIND_FOREIGN_TABLE)
-	    {
-	    	bool isKey = false;
-	    	for (key = 0; key < rel->nkeys; key++)
-	    	{
-	    		if (strcmp(NameStr(TupleDescAttr(desc,att)->attname),rel->keynames[key]) == 0)
-	    		{
-	    			isKey = true;
-	    		}
-	    	}
-	    	if (!isKey)
-	    		continue;
-	    }
-	    else if (!bms_is_member(TupleDescAttr(desc,att)->attnum - FirstLowInvalidHeapAttributeNumber,
-						   id_attrs))
-			continue;
+    for (att = 0, narg = 0; att < desc->natts; att++)
+    {
+        if (id_attrs == NULL && RelationGetForm(rel->rel)->relkind == RELKIND_FOREIGN_TABLE)
+        {
+            bool isKey = false;
+            for (key = 0; key < rel->nkeys; key++)
+            {
+                if (strcmp(NameStr(TupleDescAttr(desc,att)->attname),rel->keynames[key]) == 0)
+                {
+                    isKey = true;
+                }
+            }
+            if (!isKey)
+                continue;
+        }
+        else if (!bms_is_member(TupleDescAttr(desc,att)->attnum - FirstLowInvalidHeapAttributeNumber, id_attrs))
+            continue;
 
-		if (narg > 0)
-			appendStringInfo(&cmd, " AND %s = $%u",
-							 quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)),
-							 narg + 1);
-		else
-			appendStringInfo(&cmd, " %s = $%u",
-							 quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)),
-							 narg + 1);
+        if (narg > 0)
+            appendStringInfo(&cmd, " AND %s = $%u", quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)), narg + 1);
+        else
+            appendStringInfo(&cmd, " %s = $%u", quote_identifier(NameStr(TupleDescAttr(desc,att)->attname)), narg + 1);
 
-		argtypes[narg] = TupleDescAttr(desc,att)->atttypid;
-		values[narg] = oldtup->values[att];
-		nulls[narg] = oldtup->nulls[att] ? 'n' : ' ';
-		narg++;
-	}
+        argtypes[narg] = TupleDescAttr(desc,att)->atttypid;
+        values[narg] = oldtup->values[att];
+        nulls[narg] = oldtup->nulls[att] ? 'n' : ' ';
+        narg++;
+    }
 
-	if (SPI_execute_with_args(cmd.data, narg, argtypes, values, nulls, false,
-							  0) != SPI_OK_DELETE)
-		elog(ERROR, "SPI_execute_with_args failed");
-	MemoryContextSwitchTo(MessageContext);
+    if (SPI_execute_with_args(cmd.data, narg, argtypes, values, nulls, false, 0) != SPI_OK_DELETE)
+        elog(ERROR, "SPI_execute_with_args failed");
+    MemoryContextSwitchTo(MessageContext);
 
-	pfree(cmd.data);
+    pfree(cmd.data);
 }
 
 

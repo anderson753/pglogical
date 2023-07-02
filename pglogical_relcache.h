@@ -57,6 +57,8 @@ extern void pglogical_relation_close(PGLogicalRelation * rel,
 									  LOCKMODE lockmode);
 extern void pglogical_relation_invalidate_cb(Datum arg, Oid reloid);
 
+extern int tupdesc_get_att_by_name(TupleDesc desc, const char *attname);
+
 struct PGLogicalTupleData;
 
 #endif /* PGLOGICAL_RELCACHE_H */

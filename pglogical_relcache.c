@@ -31,9 +31,7 @@
 #define PGLOGICALRELATIONHASH_INITIAL_SIZE 128
 static HTAB *PGLogicalRelationHash = NULL;
 
-
 static void pglogical_relcache_init(void);
-static int tupdesc_get_att_by_name(TupleDesc desc, const char *attname);
 
 static void
 relcache_free_entry(PGLogicalRelation *entry)
@@ -165,7 +163,7 @@ pglogical_relation_cache_update(uint32 remoteid, char *schemaname,
 	entry->nkeys = nkeys;
 	entry->keynames = palloc(nkeys * sizeof(char *));
 	for (j = 0; j < nkeys; j++)
-		entry->keynames[j] = pstrdup(attnames[j]);
+		entry->keynames[j] = pstrdup(keynames[j]);
 	entry->attmap = palloc(natts * sizeof(int));
 	MemoryContextSwitchTo(oldcontext);
 
@@ -295,7 +293,7 @@ pglogical_relcache_init(void)
 /*
  * Find attribute index in TupleDesc struct by attribute name.
  */
-static int
+int
 tupdesc_get_att_by_name(TupleDesc desc, const char *attname)
 {
 	int		i;
