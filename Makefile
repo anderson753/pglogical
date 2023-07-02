@@ -34,7 +34,9 @@ DATA = pglogical--1.0.0.sql pglogical--1.0.0--1.0.1.sql \
 	   pglogical--2.4.0--2.4.1.sql \
 	   pglogical--2.4.1.sql \
 	   pglogical--2.4.1--2.4.2.sql \
-	   pglogical--2.4.2.sql
+	   pglogical--2.4.2.sql \
+	   pglogical--2.4.2--2.4.3.sql \
+	   pglogical--2.4.3.sql
 
 OBJS = pglogical_apply.o pglogical_conflict.o pglogical_manager.o \
 	   pglogical.o pglogical_node.o pglogical_relcache.o \
@@ -60,6 +62,7 @@ EXTRA_CLEAN += compat94/pglogical_compat.o compat95/pglogical_compat.o \
 			   compat12/pglogical_compat.o compat12/pglogical_compat.bc \
 			   compat13/pglogical_compat.o compat13/pglogical_compat.bc \
 			   compat14/pglogical_compat.o compat14/pglogical_compat.bc \
+			   compat15/pglogical_compat.o compat15/pglogical_compat.bc \
 			   pglogical_create_subscriber.o
 
 # The # in #define is taken as a comment, per https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=142043

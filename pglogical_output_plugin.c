@@ -499,9 +499,10 @@ pglogical_change_filter(PGLogicalOutputData *data, Relation relation,
 
 			/*
 			 * No replication set means global message, those are always
-			 * replicated.
+			 * replicated, but excluding TRUNCATE.
 			 */
-			if (q->replication_sets == NULL)
+			if (q->replication_sets == NULL &&
+				q->message_type != QUEUE_COMMAND_TYPE_TRUNCATE)
 				return true;
 
 			foreach (qlc, q->replication_sets)
@@ -669,7 +670,7 @@ pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 
 	/* First check the table filter */
 	if (!pglogical_change_filter(data, relation, change, &att_list))
-		return;
+		goto cleanup;
 
 	/*
 	 * If the protocol wants to write relation information and the client
@@ -730,7 +731,7 @@ pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 			Assert(false);
 	}
 
-	/* Cleanup */
+cleanup:
 	Assert(CurrentMemoryContext == data->context);
 	MemoryContextSwitchTo(old);
 	MemoryContextReset(data->context);
